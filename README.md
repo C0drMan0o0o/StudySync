@@ -4,9 +4,17 @@ A study group & room booking platform backend, built with Spring Boot.
 
 ## Status
 
-**Week 1 complete**: JWT auth (register/login) and room CRUD, both backed by
-PostgreSQL via Flyway migrations. Booking logic, study groups, and API docs
-are not built yet.
+**Done:**
+
+- JWT authentication (register/login)
+- Room CRUD
+- PostgreSQL persistence via Flyway migrations
+
+**Not built yet:**
+
+- Room booking
+- Study groups
+- API docs
 
 ## Tech stack
 
@@ -33,15 +41,15 @@ via the `JWT_SECRET` environment variable for anything beyond local dev.
 
 ## API
 
-| Method | Path | Auth required |
-|---|---|---|
-| POST | `/auth/register` | No |
-| POST | `/auth/login` | No |
-| GET | `/rooms` | Yes |
-| GET | `/rooms/{id}` | Yes |
-| POST | `/rooms` | Yes |
-| PUT | `/rooms/{id}` | Yes |
-| DELETE | `/rooms/{id}` | Yes |
+| Method | Path             | Auth required |
+|--------|------------------|---------------|
+| POST   | `/auth/register` | No            |
+| POST   | `/auth/login`    | No            |
+| GET    | `/rooms`         | Yes           |
+| GET    | `/rooms/{id}`    | Yes           |
+| POST   | `/rooms`         | Yes           |
+| PUT    | `/rooms/{id}`    | Yes           |
+| DELETE | `/rooms/{id}`    | Yes           |
 
 Authenticated requests need `Authorization: Bearer <token>` from
 `/auth/login` or `/auth/register`. `/auth/login` and `/auth/register` are
