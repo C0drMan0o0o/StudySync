@@ -9,6 +9,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -17,17 +18,19 @@ public class BookingService {
 
     private final BookingRepository bookingRepository;
     private final RoomRepository roomRepository;
+    private final Clock clock;
 
-    public BookingService(BookingRepository bookingRepository, RoomRepository roomRepository) {
+    public BookingService(BookingRepository bookingRepository, RoomRepository roomRepository, Clock clock) {
         this.bookingRepository = bookingRepository;
         this.roomRepository = roomRepository;
+        this.clock = clock;
     }
 
     public Booking createBooking(User user, Long roomId, LocalDateTime startTime, LocalDateTime endTime) {
         if (!startTime.isBefore(endTime)) {
             throw new IllegalArgumentException("Booking start time must be before end time");
         }
-        if (!startTime.isAfter(LocalDateTime.now())) {
+        if (!startTime.isAfter(LocalDateTime.now(clock))) {
             throw new IllegalArgumentException("Booking start time must be in the future");
         }
 
@@ -43,7 +46,7 @@ public class BookingService {
                 .room(room)
                 .startTime(startTime)
                 .endTime(endTime)
-                .createdAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now(clock))
                 .build();
 
         try {
