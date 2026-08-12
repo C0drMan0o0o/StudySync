@@ -1,19 +1,19 @@
 package com.sanjith.studysync.security;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.lang.NonNull;
-import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
-
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.lang.NonNull;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * Per-IP token bucket limiting on auth endpoints, to blunt brute-force / credential-stuffing.
@@ -24,8 +24,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final Set<String> LIMITED_PATHS = Set.of("/auth/login", "/auth/register");
     private static final int CAPACITY = 10;
     private static final Duration REFILL_PERIOD = Duration.ofMinutes(1);
+    private static final Duration BUCKET_IDLE_EXPIRY = Duration.ofMinutes(10);
+    private static final long MAX_TRACKED_BUCKETS = 100_000;
 
-    private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
+    private final Cache<String, Bucket> buckets = Caffeine.newBuilder()
+            .expireAfterAccess(BUCKET_IDLE_EXPIRY)
+            .maximumSize(MAX_TRACKED_BUCKETS)
+            .build();
 
     @Override
     protected void doFilterInternal(
@@ -35,7 +40,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         if (LIMITED_PATHS.contains(request.getRequestURI())) {
             String key = request.getRemoteAddr() + ":" + request.getRequestURI();
-            Bucket bucket = buckets.computeIfAbsent(key, k -> newBucket());
+            Bucket bucket = buckets.get(key, k -> newBucket());
             if (!bucket.tryConsume(1)) {
                 response.setStatus(429);
                 response.getWriter().write("Too many requests, please try again later.");
