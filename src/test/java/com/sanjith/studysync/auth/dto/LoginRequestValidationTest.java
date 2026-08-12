@@ -52,4 +52,13 @@ class LoginRequestValidationTest {
 
         assertThat(violations).anyMatch(v -> v.getPropertyPath().toString().equals("password"));
     }
+
+    @Test
+    void passwordLongerThan72CharactersIsRejected() {
+        LoginRequest request = new LoginRequest("alice@test.com", "a".repeat(73));
+
+        Set<ConstraintViolation<LoginRequest>> violations = validator.validate(request);
+
+        assertThat(violations).anyMatch(v -> v.getPropertyPath().toString().equals("password"));
+    }
 }

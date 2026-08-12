@@ -70,4 +70,22 @@ class RegisterRequestValidationTest {
 
         assertThat(violations).anyMatch(v -> v.getPropertyPath().toString().equals("name"));
     }
+
+    @Test
+    void nameLongerThan255CharactersIsRejected() {
+        RegisterRequest request = new RegisterRequest("alice@test.com", "password123", "A".repeat(256));
+
+        Set<ConstraintViolation<RegisterRequest>> violations = validator.validate(request);
+
+        assertThat(violations).anyMatch(v -> v.getPropertyPath().toString().equals("name"));
+    }
+
+    @Test
+    void passwordLongerThan72CharactersIsRejected() {
+        RegisterRequest request = new RegisterRequest("alice@test.com", "a".repeat(73), "Alice");
+
+        Set<ConstraintViolation<RegisterRequest>> violations = validator.validate(request);
+
+        assertThat(violations).anyMatch(v -> v.getPropertyPath().toString().equals("password"));
+    }
 }

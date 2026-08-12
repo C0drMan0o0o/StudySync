@@ -8,10 +8,10 @@ import com.sanjith.studysync.common.exception.InvalidCredentialsException;
 import com.sanjith.studysync.security.JwtUtil;
 import com.sanjith.studysync.user.User;
 import com.sanjith.studysync.user.UserRepository;
+import java.time.LocalDateTime;
+import java.util.Optional;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
 
 @Service
 public class AuthService {
@@ -19,11 +19,13 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final String dummyPasswordHash;
 
     public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
+        this.dummyPasswordHash = passwordEncoder.encode("timing-attack-mitigation-dummy-password");
     }
 
     public AuthResponse register(RegisterRequest request) {
@@ -43,13 +45,14 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.email())
-                .orElseThrow(InvalidCredentialsException::new);
+        Optional<User> user = userRepository.findByEmail(request.email());
+        String hashToCheck = user.map(User::getPasswordHash).orElse(dummyPasswordHash);
+        boolean passwordMatches = passwordEncoder.matches(request.password(), hashToCheck);
 
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        if (user.isEmpty() || !passwordMatches) {
             throw new InvalidCredentialsException();
         }
 
-        return new AuthResponse(jwtUtil.generateToken(user.getEmail()));
+        return new AuthResponse(jwtUtil.generateToken(user.get().getEmail()));
     }
 }
