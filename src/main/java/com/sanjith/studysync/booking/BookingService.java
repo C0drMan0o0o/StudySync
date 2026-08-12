@@ -1,6 +1,7 @@
 package com.sanjith.studysync.booking;
 
 import com.sanjith.studysync.common.exception.BookingConflictException;
+import com.sanjith.studysync.common.exception.InvalidBookingRequestException;
 import com.sanjith.studysync.common.exception.ResourceNotFoundException;
 import com.sanjith.studysync.room.Room;
 import com.sanjith.studysync.room.RoomRepository;
@@ -28,10 +29,10 @@ public class BookingService {
 
     public Booking createBooking(User user, Long roomId, LocalDateTime startTime, LocalDateTime endTime) {
         if (!startTime.isBefore(endTime)) {
-            throw new IllegalArgumentException("Booking start time must be before end time");
+            throw new InvalidBookingRequestException("Booking start time must be before end time");
         }
         if (!startTime.isAfter(LocalDateTime.now(clock))) {
-            throw new IllegalArgumentException("Booking start time must be in the future");
+            throw new InvalidBookingRequestException("Booking start time must be in the future");
         }
 
         Room room = roomRepository.findById(roomId)

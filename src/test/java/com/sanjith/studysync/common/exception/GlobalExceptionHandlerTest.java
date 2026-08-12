@@ -61,4 +61,13 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getBody()).containsEntry("error", "Room not found: 99");
     }
+
+    @Test
+    void handlesInvalidBookingRequestAsBadRequest() {
+        ResponseEntity<Map<String, String>> response = handler.handleInvalidBookingRequest(
+                new InvalidBookingRequestException("Booking start time must be before end time"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).containsEntry("error", "Booking start time must be before end time");
+    }
 }

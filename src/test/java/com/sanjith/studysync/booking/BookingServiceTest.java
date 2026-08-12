@@ -1,6 +1,7 @@
 package com.sanjith.studysync.booking;
 
 import com.sanjith.studysync.common.exception.BookingConflictException;
+import com.sanjith.studysync.common.exception.InvalidBookingRequestException;
 import com.sanjith.studysync.common.exception.ResourceNotFoundException;
 import com.sanjith.studysync.room.Room;
 import com.sanjith.studysync.room.RoomRepository;
@@ -73,7 +74,7 @@ class BookingServiceTest {
         bookingService = new BookingService(bookingRepository, roomRepository, clock);
 
         assertThatThrownBy(() -> bookingService.createBooking(user, 1L, end, start))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvalidBookingRequestException.class);
     }
 
     @Test
@@ -82,7 +83,7 @@ class BookingServiceTest {
         LocalDateTime pastStart = LocalDateTime.now(clock).minusDays(1);
 
         assertThatThrownBy(() -> bookingService.createBooking(user, 1L, pastStart, pastStart.plusHours(1)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvalidBookingRequestException.class);
     }
 
     @Test
