@@ -67,6 +67,15 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void handlesLastGroupMemberAsConflict() {
+        ResponseEntity<Map<String, String>> response = handler.handleLastGroupMember(
+                new LastGroupMemberException("Cannot remove the last member of a group"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody()).containsEntry("error", "Cannot remove the last member of a group");
+    }
+
+    @Test
     void handlesInvalidBookingRequestAsBadRequest() {
         ResponseEntity<Map<String, String>> response = handler.handleInvalidBookingRequest(
                 new InvalidBookingRequestException("Booking start time must be before end time"));

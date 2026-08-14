@@ -51,6 +51,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ex.getMessage()));
     }
 
+    @ExceptionHandler(LastGroupMemberException.class)
+    public ResponseEntity<Map<String, String>> handleLastGroupMember(LastGroupMemberException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ex.getMessage()));
+    }
+
     @ExceptionHandler(InvalidBookingRequestException.class)
     public ResponseEntity<Map<String, String>> handleInvalidBookingRequest(InvalidBookingRequestException ex) {
         return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
