@@ -25,6 +25,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.transaction.PlatformTransactionManager;
 
 @ExtendWith(MockitoExtension.class)
 class BookingServiceTest {
@@ -38,6 +39,9 @@ class BookingServiceTest {
     @Mock
     private GroupService groupService;
 
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
     private BookingService bookingService;
 
     private final Room room = Room.builder().id(1L).name("Room A").capacity(4).location("Floor 1").build();
@@ -46,9 +50,13 @@ class BookingServiceTest {
     private final LocalDateTime start = LocalDateTime.now(clock).plusDays(1);
     private final LocalDateTime end = start.plusHours(1);
 
+    private void setUp() {
+        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock, transactionManager);
+    }
+
     @Test
     void createBookingSucceedsWhenNoOverlap() {
-        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
+        setUp();
         when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
         when(bookingRepository.findOverlapping(1L, start, end)).thenReturn(Collections.emptyList());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -64,7 +72,7 @@ class BookingServiceTest {
 
     @Test
     void createBookingThrowsConflictWhenOverlapExists() {
-        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
+        setUp();
         when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
         when(bookingRepository.findOverlapping(1L, start, end))
                 .thenReturn(List.of(Booking.builder().id(2L).build()));
@@ -75,7 +83,7 @@ class BookingServiceTest {
 
     @Test
     void createBookingThrowsWhenStartIsNotBeforeEnd() {
-        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
+        setUp();
 
         assertThatThrownBy(() -> bookingService.createBooking(user, 1L, null, end, start))
                 .isInstanceOf(InvalidBookingRequestException.class);
@@ -83,7 +91,7 @@ class BookingServiceTest {
 
     @Test
     void createBookingThrowsWhenStartIsInThePast() {
-        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
+        setUp();
         LocalDateTime pastStart = LocalDateTime.now(clock).minusDays(1);
 
         assertThatThrownBy(() -> bookingService.createBooking(user, 1L, null, pastStart, pastStart.plusHours(1)))
@@ -92,7 +100,7 @@ class BookingServiceTest {
 
     @Test
     void createBookingThrowsWhenRoomDoesNotExist() {
-        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
+        setUp();
         when(roomRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> bookingService.createBooking(user, 99L, null, start, end))
@@ -101,7 +109,7 @@ class BookingServiceTest {
 
     @Test
     void createBookingTranslatesDataIntegrityViolationToBookingConflict() {
-        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
+        setUp();
         when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
         when(bookingRepository.findOverlapping(1L, start, end)).thenReturn(Collections.emptyList());
         when(bookingRepository.save(any(Booking.class))).thenThrow(new DataIntegrityViolationException("conflict"));
@@ -112,7 +120,7 @@ class BookingServiceTest {
 
     @Test
     void createBookingThrowsWhenRequesterIsNotAGroupMember() {
-        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
+        setUp();
         when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
         when(groupService.findById(5L)).thenReturn(null);
         when(groupService.isMember(5L, user.getId())).thenReturn(false);
@@ -123,7 +131,7 @@ class BookingServiceTest {
 
     @Test
     void cancelBookingRemovesBookingWhenOwnedByRequestingUser() {
-        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
+        setUp();
         Booking booking = Booking.builder().id(1L).user(user).room(room).build();
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
 
@@ -132,7 +140,7 @@ class BookingServiceTest {
 
     @Test
     void cancelBookingThrowsWhenRequestingUserIsNotOwner() {
-        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
+        setUp();
         Booking booking = Booking.builder().id(1L).user(user).room(room).build();
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
 
@@ -142,7 +150,7 @@ class BookingServiceTest {
 
     @Test
     void cancelBookingThrowsWhenBookingDoesNotExist() {
-        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
+        setUp();
         when(bookingRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> bookingService.cancelBooking(99L, 1L))

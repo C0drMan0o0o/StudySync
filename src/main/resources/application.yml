@@ -5,6 +5,9 @@ spring:
     url: jdbc:postgresql://localhost:5432/studysync
     username: studysync
     password: studysync
+    hikari:
+      maximum-pool-size: 500
+      connection-timeout: 30000
   jpa:
     hibernate:
       ddl-auto: validate
@@ -20,3 +23,9 @@ jwt:
 server:
   port: 8080
   forward-headers-strategy: framework
+  tomcat:
+    threads:
+      max: 500
+    accept-count: 10000
+    max-connections: 20000
+    connection-timeout: 20000
