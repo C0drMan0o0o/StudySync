@@ -38,6 +38,14 @@ public class JwtUtil {
         return parseClaims(token).getSubject();
     }
 
+    public String validateAndExtractEmail(String token) {
+        try {
+            return parseClaims(token).getSubject();
+        } catch (JwtException | IllegalArgumentException e) {
+            return null;
+        }
+    }
+
     public boolean isValid(String token) {
         try {
             parseClaims(token);

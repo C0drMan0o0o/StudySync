@@ -44,8 +44,7 @@ class JwtAuthFilterTest {
     void setsAuthenticationWhenTokenIsValid() throws Exception {
         filter = new JwtAuthFilter(jwtUtil, userDetailsService);
         when(request.getHeader("Authorization")).thenReturn("Bearer valid-token");
-        when(jwtUtil.isValid("valid-token")).thenReturn(true);
-        when(jwtUtil.extractEmail("valid-token")).thenReturn("alice@test.com");
+        when(jwtUtil.validateAndExtractEmail("valid-token")).thenReturn("alice@test.com");
         UserDetails userDetails = User.withUsername("alice@test.com").password("x").authorities(java.util.List.of()).build();
         when(userDetailsService.loadUserByUsername("alice@test.com")).thenReturn(userDetails);
 
@@ -82,7 +81,7 @@ class JwtAuthFilterTest {
     void doesNotSetAuthenticationWhenTokenIsInvalid() throws Exception {
         filter = new JwtAuthFilter(jwtUtil, userDetailsService);
         when(request.getHeader("Authorization")).thenReturn("Bearer bad-token");
-        when(jwtUtil.isValid("bad-token")).thenReturn(false);
+        when(jwtUtil.validateAndExtractEmail("bad-token")).thenReturn(null);
 
         filter.doFilter(request, response, filterChain);
 
