@@ -1,6 +1,48 @@
 # Add System.Net.Http assembly to make concurrent web requests
 Add-Type -AssemblyName System.Net.Http
 
+# Helper function to extract error response body across different PowerShell and .NET versions
+function Get-ErrorResponseBody {
+    param($ErrorRecord)
+    
+    if (-not $ErrorRecord -or -not $ErrorRecord.Exception) {
+        return $null
+    }
+    
+    $exc = $ErrorRecord.Exception
+    
+    # Check if it has a Response property (common to WebException and HttpResponseException)
+    if ($exc.Response) {
+        $response = $exc.Response
+        # Check if it is a System.Net.Http.HttpResponseMessage (PowerShell 6+)
+        if ($response -is [System.Net.Http.HttpResponseMessage]) {
+            try {
+                return $response.Content.ReadAsStringAsync().Result
+            } catch {}
+        }
+        # Check if it is a System.Net.WebResponse (PowerShell 5.1)
+        elseif ($response -is [System.Net.WebResponse] -or $response.GetType().GetMethod("GetResponseStream")) {
+            try {
+                $stream = $response.GetResponseStream()
+                if ($stream) {
+                    $reader = New-Object System.IO.StreamReader($stream)
+                    $body = $reader.ReadToEnd()
+                    $reader.Dispose()
+                    $stream.Dispose()
+                    return $body
+                }
+            } catch {}
+        }
+    }
+    
+    # Fallback to ErrorDetails message
+    if ($ErrorRecord.ErrorDetails -and $ErrorRecord.ErrorDetails.Message) {
+        return $ErrorRecord.ErrorDetails.Message
+    }
+    
+    return $null
+}
+
 # Default parameters or overrides from environment
 $BaseUrl = $env:BASE_URL
 if ([string]::IsNullOrEmpty($BaseUrl)) {
@@ -44,9 +86,8 @@ try {
     $RegisterResponse = Invoke-WebRequest -Uri "$BaseUrl/auth/register" -Method Post -ContentType "application/json" -Body $RegisterBody -UseBasicParsing
 } catch {
     Write-Error "Registration failed"
-    if ($_.Exception -and $_.Exception.Response) {
-        $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
-        $errBody = $reader.ReadToEnd()
+    $errBody = Get-ErrorResponseBody $_
+    if ($errBody) {
         Write-Error "Response body: $errBody"
     }
     exit 1
@@ -75,9 +116,8 @@ try {
     $RoomResponse = Invoke-WebRequest -Uri "$BaseUrl/rooms" -Method Post -ContentType "application/json" -Headers $RoomHeaders -Body $RoomBody -UseBasicParsing
 } catch {
     Write-Error "Room creation failed"
-    if ($_.Exception -and $_.Exception.Response) {
-        $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
-        $errBody = $reader.ReadToEnd()
+    $errBody = Get-ErrorResponseBody $_
+    if ($errBody) {
         Write-Error "Response body: $errBody"
     }
     exit 1
