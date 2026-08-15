@@ -38,7 +38,7 @@ public class BookingController {
             @Valid @RequestBody BookingRequest request, Authentication authentication) {
         User user = currentUser(authentication);
         Booking booking = bookingService.createBooking(
-                user, request.roomId(), request.startTime(), request.endTime());
+                user, request.roomId(), request.groupId(), request.startTime(), request.endTime());
         return ResponseEntity.status(HttpStatus.CREATED).body(BookingResponse.from(booking));
     }
 

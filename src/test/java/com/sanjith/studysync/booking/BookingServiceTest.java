@@ -53,10 +53,11 @@ class BookingServiceTest {
         when(bookingRepository.findOverlapping(1L, start, end)).thenReturn(Collections.emptyList());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Booking result = bookingService.createBooking(user, 1L, start, end);
+        Booking result = bookingService.createBooking(user, 1L, null, start, end);
 
         assertThat(result.getUser()).isEqualTo(user);
         assertThat(result.getRoom()).isEqualTo(room);
+        assertThat(result.getGroup()).isNull();
         assertThat(result.getStartTime()).isEqualTo(start);
         assertThat(result.getEndTime()).isEqualTo(end);
     }
@@ -68,7 +69,7 @@ class BookingServiceTest {
         when(bookingRepository.findOverlapping(1L, start, end))
                 .thenReturn(List.of(Booking.builder().id(2L).build()));
 
-        assertThatThrownBy(() -> bookingService.createBooking(user, 1L, start, end))
+        assertThatThrownBy(() -> bookingService.createBooking(user, 1L, null, start, end))
                 .isInstanceOf(BookingConflictException.class);
     }
 
@@ -76,7 +77,7 @@ class BookingServiceTest {
     void createBookingThrowsWhenStartIsNotBeforeEnd() {
         bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
 
-        assertThatThrownBy(() -> bookingService.createBooking(user, 1L, end, start))
+        assertThatThrownBy(() -> bookingService.createBooking(user, 1L, null, end, start))
                 .isInstanceOf(InvalidBookingRequestException.class);
     }
 
@@ -85,7 +86,7 @@ class BookingServiceTest {
         bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
         LocalDateTime pastStart = LocalDateTime.now(clock).minusDays(1);
 
-        assertThatThrownBy(() -> bookingService.createBooking(user, 1L, pastStart, pastStart.plusHours(1)))
+        assertThatThrownBy(() -> bookingService.createBooking(user, 1L, null, pastStart, pastStart.plusHours(1)))
                 .isInstanceOf(InvalidBookingRequestException.class);
     }
 
@@ -94,7 +95,7 @@ class BookingServiceTest {
         bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
         when(roomRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> bookingService.createBooking(user, 99L, start, end))
+        assertThatThrownBy(() -> bookingService.createBooking(user, 99L, null, start, end))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -105,8 +106,19 @@ class BookingServiceTest {
         when(bookingRepository.findOverlapping(1L, start, end)).thenReturn(Collections.emptyList());
         when(bookingRepository.save(any(Booking.class))).thenThrow(new DataIntegrityViolationException("conflict"));
 
-        assertThatThrownBy(() -> bookingService.createBooking(user, 1L, start, end))
+        assertThatThrownBy(() -> bookingService.createBooking(user, 1L, null, start, end))
                 .isInstanceOf(BookingConflictException.class);
+    }
+
+    @Test
+    void createBookingThrowsWhenRequesterIsNotAGroupMember() {
+        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
+        when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
+        when(groupService.findById(5L)).thenReturn(null);
+        when(groupService.isMember(5L, user.getId())).thenReturn(false);
+
+        assertThatThrownBy(() -> bookingService.createBooking(user, 1L, 5L, start, end))
+                .isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
