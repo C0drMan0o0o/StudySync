@@ -3,27 +3,33 @@ package com.sanjith.studysync.booking;
 import com.sanjith.studysync.common.exception.BookingConflictException;
 import com.sanjith.studysync.common.exception.InvalidBookingRequestException;
 import com.sanjith.studysync.common.exception.ResourceNotFoundException;
+import com.sanjith.studysync.group.GroupService;
 import com.sanjith.studysync.room.Room;
 import com.sanjith.studysync.room.RoomRepository;
 import com.sanjith.studysync.user.User;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.stereotype.Service;
-
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.stereotype.Service;
 
 @Service
 public class BookingService {
 
     private final BookingRepository bookingRepository;
     private final RoomRepository roomRepository;
+    private final GroupService groupService;
     private final Clock clock;
 
-    public BookingService(BookingRepository bookingRepository, RoomRepository roomRepository, Clock clock) {
+    public BookingService(
+            BookingRepository bookingRepository,
+            RoomRepository roomRepository,
+            GroupService groupService,
+            Clock clock) {
         this.bookingRepository = bookingRepository;
         this.roomRepository = roomRepository;
+        this.groupService = groupService;
         this.clock = clock;
     }
 

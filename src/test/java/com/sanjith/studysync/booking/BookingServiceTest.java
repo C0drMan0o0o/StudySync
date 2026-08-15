@@ -1,18 +1,17 @@
 package com.sanjith.studysync.booking;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
 import com.sanjith.studysync.common.exception.BookingConflictException;
 import com.sanjith.studysync.common.exception.InvalidBookingRequestException;
 import com.sanjith.studysync.common.exception.ResourceNotFoundException;
+import com.sanjith.studysync.group.GroupService;
 import com.sanjith.studysync.room.Room;
 import com.sanjith.studysync.room.RoomRepository;
 import com.sanjith.studysync.user.User;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.access.AccessDeniedException;
-
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -20,11 +19,12 @@ import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.AccessDeniedException;
 
 @ExtendWith(MockitoExtension.class)
 class BookingServiceTest {
@@ -34,6 +34,9 @@ class BookingServiceTest {
 
     @Mock
     private RoomRepository roomRepository;
+
+    @Mock
+    private GroupService groupService;
 
     private BookingService bookingService;
 
@@ -45,7 +48,7 @@ class BookingServiceTest {
 
     @Test
     void createBookingSucceedsWhenNoOverlap() {
-        bookingService = new BookingService(bookingRepository, roomRepository, clock);
+        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
         when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
         when(bookingRepository.findOverlapping(1L, start, end)).thenReturn(Collections.emptyList());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -60,7 +63,7 @@ class BookingServiceTest {
 
     @Test
     void createBookingThrowsConflictWhenOverlapExists() {
-        bookingService = new BookingService(bookingRepository, roomRepository, clock);
+        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
         when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
         when(bookingRepository.findOverlapping(1L, start, end))
                 .thenReturn(List.of(Booking.builder().id(2L).build()));
@@ -71,7 +74,7 @@ class BookingServiceTest {
 
     @Test
     void createBookingThrowsWhenStartIsNotBeforeEnd() {
-        bookingService = new BookingService(bookingRepository, roomRepository, clock);
+        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
 
         assertThatThrownBy(() -> bookingService.createBooking(user, 1L, end, start))
                 .isInstanceOf(InvalidBookingRequestException.class);
@@ -79,7 +82,7 @@ class BookingServiceTest {
 
     @Test
     void createBookingThrowsWhenStartIsInThePast() {
-        bookingService = new BookingService(bookingRepository, roomRepository, clock);
+        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
         LocalDateTime pastStart = LocalDateTime.now(clock).minusDays(1);
 
         assertThatThrownBy(() -> bookingService.createBooking(user, 1L, pastStart, pastStart.plusHours(1)))
@@ -88,7 +91,7 @@ class BookingServiceTest {
 
     @Test
     void createBookingThrowsWhenRoomDoesNotExist() {
-        bookingService = new BookingService(bookingRepository, roomRepository, clock);
+        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
         when(roomRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> bookingService.createBooking(user, 99L, start, end))
@@ -97,7 +100,7 @@ class BookingServiceTest {
 
     @Test
     void createBookingTranslatesDataIntegrityViolationToBookingConflict() {
-        bookingService = new BookingService(bookingRepository, roomRepository, clock);
+        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
         when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
         when(bookingRepository.findOverlapping(1L, start, end)).thenReturn(Collections.emptyList());
         when(bookingRepository.save(any(Booking.class))).thenThrow(new DataIntegrityViolationException("conflict"));
@@ -108,7 +111,7 @@ class BookingServiceTest {
 
     @Test
     void cancelBookingRemovesBookingWhenOwnedByRequestingUser() {
-        bookingService = new BookingService(bookingRepository, roomRepository, clock);
+        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
         Booking booking = Booking.builder().id(1L).user(user).room(room).build();
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
 
@@ -117,7 +120,7 @@ class BookingServiceTest {
 
     @Test
     void cancelBookingThrowsWhenRequestingUserIsNotOwner() {
-        bookingService = new BookingService(bookingRepository, roomRepository, clock);
+        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
         Booking booking = Booking.builder().id(1L).user(user).room(room).build();
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
 
@@ -127,7 +130,7 @@ class BookingServiceTest {
 
     @Test
     void cancelBookingThrowsWhenBookingDoesNotExist() {
-        bookingService = new BookingService(bookingRepository, roomRepository, clock);
+        bookingService = new BookingService(bookingRepository, roomRepository, groupService, clock);
         when(bookingRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> bookingService.cancelBooking(99L, 1L))
