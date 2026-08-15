@@ -67,12 +67,17 @@ $Email = "concurrency-test-$RunId@example.com"
 Write-Host "== Concurrent booking test (concurrency=$Concurrency) =="
 Write-Host "Base URL: $BaseUrl"
 
-# Verify if the app is reachable
+# Verify if the app is reachable. Any HTTP response (even 4xx/5xx) proves the server is up.
 try {
     $null = Invoke-WebRequest -Uri "$BaseUrl/rooms" -Method Get -TimeoutSec 5 -UseBasicParsing
 } catch {
-    Write-Error "Cannot reach $BaseUrl -- is the app running? (mvn spring-boot:run)"
-    exit 1
+    # An HTTP error status (e.g. 401/403) still means the server responded, so it is reachable.
+    if ($_.Exception.Response) {
+        # Server is up (responded with an HTTP status); reachability is confirmed.
+    } else {
+        Write-Error "Cannot reach $BaseUrl -- is the app running? (mvn spring-boot:run)"
+        exit 1
+    }
 }
 
 Write-Host "-- Registering test user $Email"

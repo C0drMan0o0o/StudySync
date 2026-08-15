@@ -12,6 +12,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -71,7 +72,11 @@ public class BookingService {
 
         try {
             return bookingRepository.save(booking);
-        } catch (DataIntegrityViolationException ex) {
+        } catch (DataIntegrityViolationException | CannotAcquireLockException ex) {
+            // A DataIntegrityViolationException fires when the exclusion constraint rejects a
+            // double-booking. Under high concurrency the same check can surface as a PostgreSQL
+            // deadlock (CannotAcquireLockException) instead; in both cases the requested time
+            // range is genuinely taken, so it is reported as a 409 conflict.
             throw new BookingConflictException("Room is already booked for the requested time range");
         }
     }
