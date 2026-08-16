@@ -57,8 +57,8 @@ class BookingServiceTest {
     @Test
     void createBookingSucceedsWhenNoOverlap() {
         setUp();
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
-        when(bookingRepository.findOverlapping(1L, start, end)).thenReturn(Collections.emptyList());
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(room));
+        when(bookingRepository.existsOverlapping(1L, start, end)).thenReturn(false);
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Booking result = bookingService.createBooking(user, 1L, null, start, end);
@@ -73,9 +73,8 @@ class BookingServiceTest {
     @Test
     void createBookingThrowsConflictWhenOverlapExists() {
         setUp();
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
-        when(bookingRepository.findOverlapping(1L, start, end))
-                .thenReturn(List.of(Booking.builder().id(2L).build()));
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(room));
+        when(bookingRepository.existsOverlapping(1L, start, end)).thenReturn(true);
 
         assertThatThrownBy(() -> bookingService.createBooking(user, 1L, null, start, end))
                 .isInstanceOf(BookingConflictException.class);
@@ -101,7 +100,7 @@ class BookingServiceTest {
     @Test
     void createBookingThrowsWhenRoomDoesNotExist() {
         setUp();
-        when(roomRepository.findById(99L)).thenReturn(Optional.empty());
+        when(roomRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> bookingService.createBooking(user, 99L, null, start, end))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -110,8 +109,8 @@ class BookingServiceTest {
     @Test
     void createBookingTranslatesDataIntegrityViolationToBookingConflict() {
         setUp();
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
-        when(bookingRepository.findOverlapping(1L, start, end)).thenReturn(Collections.emptyList());
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(room));
+        when(bookingRepository.existsOverlapping(1L, start, end)).thenReturn(false);
         when(bookingRepository.save(any(Booking.class))).thenThrow(new DataIntegrityViolationException("conflict"));
 
         assertThatThrownBy(() -> bookingService.createBooking(user, 1L, null, start, end))
@@ -121,7 +120,7 @@ class BookingServiceTest {
     @Test
     void createBookingThrowsWhenRequesterIsNotAGroupMember() {
         setUp();
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(room));
         when(groupService.findById(5L)).thenReturn(null);
         when(groupService.isMember(5L, user.getId())).thenReturn(false);
 

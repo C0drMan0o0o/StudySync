@@ -108,7 +108,7 @@ public class BookingService {
 
     private Booking doCreateBooking(
             User user, Long roomId, Long groupId, LocalDateTime startTime, LocalDateTime endTime) {
-        Room room = roomRepository.findById(roomId)
+        Room room = roomRepository.findByIdForUpdate(roomId)
                 .orElseThrow(() -> new ResourceNotFoundException("Room not found: " + roomId));
 
         StudyGroup group = null;
@@ -119,7 +119,7 @@ public class BookingService {
             }
         }
 
-        if (!bookingRepository.findOverlapping(roomId, startTime, endTime).isEmpty()) {
+        if (bookingRepository.existsOverlapping(roomId, startTime, endTime)) {
             throw new BookingConflictException("Room is already booked for the requested time range");
         }
 

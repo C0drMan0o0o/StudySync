@@ -9,9 +9,9 @@ import java.util.List;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
-    @Query("SELECT b FROM Booking b WHERE b.room.id = :roomId "
+    @Query("SELECT CASE WHEN COUNT(b) > 0 THEN true ELSE false END FROM Booking b WHERE b.room.id = :roomId "
             + "AND b.startTime < :end AND b.endTime > :start")
-    List<Booking> findOverlapping(
+    boolean existsOverlapping(
             @Param("roomId") Long roomId, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     List<Booking> findByUserId(Long userId);
