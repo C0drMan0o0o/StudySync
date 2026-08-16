@@ -9,9 +9,10 @@ A study group & room booking platform backend, built with Spring Boot.
 - JWT authentication (register/login), with timing-attack-resistant login
 - Room CRUD
 - Room booking with two-layer conflict detection (application + database),
-  optionally on behalf of a study group
+  optionally on behalf of a study group, featuring concurrent deadlock retries
 - Study groups: create, list, add/remove members
-- PostgreSQL persistence via Flyway migrations
+- PostgreSQL persistence via Flyway migrations with performance indexing
+- Spring Boot Actuator for health checks and metrics monitoring
 - API docs (OpenAPI/Swagger UI)
 
 **Not built yet:**
@@ -34,6 +35,7 @@ A study group & room booking platform backend, built with Spring Boot.
 - Java 21, Spring Boot 4.1.0, Maven
 - PostgreSQL 16 (Docker), Flyway migrations, Spring Data JPA (`ddl-auto: validate`)
 - Spring Security 7, JWT (`jjwt`), BCrypt, Bucket4j + Caffeine rate limiting
+- Spring Boot Actuator (Metrics & Health)
 - springdoc-openapi (Swagger UI)
 
 ## Running locally
@@ -102,11 +104,8 @@ rate-limited to 10 requests/minute per IP. Interactive API docs are at
   either way. Verified by firing 10 concurrent conflicting `POST /bookings`
   requests at the same slot: exactly one succeeds, the rest get 409, and the
   Postgres logs show the exclusion constraint — not the application check —
-  rejecting the losers. `createBooking` also runs inside a single
-  `@Transactional` block, so the room lookup, group-membership check, overlap
-  check, and insert share one transaction instead of running as separate
-  auto-committing calls — the exclusion constraint is still what actually
-  closes the race between concurrent requests, not the transaction boundary.
+  rejecting the losers.
+- **Programmatic Transaction Retries & Room Locking**: To support high concurrency and mitigate database deadlock cycles (`40P01` SQLState) caused by overlapping slot insert contentions, booking creations bypass declarative `@Transactional` scopes. Instead, they run programmatically inside a `TransactionTemplate` retry loop (5 attempts with exponential backoff). The transaction begins by acquiring a pessimistic write lock on the target room (`findByIdForUpdate`), serializing competing bookings for the same room. Overlap validation checks are optimized using a fast database `EXISTS` query (`existsOverlapping`) rather than loading booking entities into JVM memory.
 - **Time comes from an injected `Clock`, not `LocalDateTime.now()`**:
   `BookingService` and `GroupService` take a `java.time.Clock` via
   constructor injection (`ClockConfig` provides `Clock.systemDefaultZone()`
@@ -133,6 +132,8 @@ rate-limited to 10 requests/minute per IP. Interactive API docs are at
   `ConcurrentHashMap` keyed by remote address — a slow memory-exhaustion
   vector. It's now a Caffeine cache that evicts idle entries and caps total
   size.
+- **Optimized Security Context Caching**: Authenticated API controllers (`BookingController`, `GroupController`) extract the domain `User` entity directly from Spring Security's `UserPrincipal` context (which implements `UserDetails` and holds the `User` model) rather than making redundant repository queries (`findByEmail`) on every request.
+- **Optimized JWT Processing**: Token verification and email claim extraction in `JwtUtil` are combined into `validateAndExtractEmail(token)`. This ensures that JWT claims are parsed and verified once per request inside `JwtAuthFilter` instead of twice.
 - **Every exception maps to a sanitized response**: `GlobalExceptionHandler`
   has a logging catch-all plus explicit mappings for the common Spring MVC
   exceptions (malformed body, type mismatch, unsupported method, unknown
