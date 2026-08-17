@@ -35,6 +35,6 @@ public abstract class BaseIntegrationTest {
     @Autowired
     protected MockMvc mockMvc;
 
-    @Autowired
-    protected ObjectMapper objectMapper;
+    protected final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
 }
