@@ -51,6 +51,7 @@ class GroupServiceTest {
         groupService = new GroupService(groupRepository, userRepository, clock);
         StudyGroup group = groupWithMembers(creator);
         when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
+        when(groupRepository.existsByIdAndMembersId(1L, creator.getId())).thenReturn(true);
         when(userRepository.findById(2L)).thenReturn(Optional.of(member));
         when(groupRepository.save(any(StudyGroup.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -83,6 +84,7 @@ class GroupServiceTest {
         groupService = new GroupService(groupRepository, userRepository, clock);
         StudyGroup group = groupWithMembers(creator, member);
         when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
+        when(groupRepository.existsByIdAndMembersId(1L, member.getId())).thenReturn(true);
         when(groupRepository.save(any(StudyGroup.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         StudyGroup result = groupService.removeMember(1L, member.getId(), member.getId());
@@ -95,6 +97,7 @@ class GroupServiceTest {
         groupService = new GroupService(groupRepository, userRepository, clock);
         StudyGroup group = groupWithMembers(creator, member);
         when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
+        when(groupRepository.existsByIdAndMembersId(1L, member.getId())).thenReturn(true);
 
         assertThatThrownBy(() -> groupService.removeMember(1L, creator.getId(), member.getId()))
                 .isInstanceOf(AccessDeniedException.class);
@@ -105,6 +108,7 @@ class GroupServiceTest {
         groupService = new GroupService(groupRepository, userRepository, clock);
         StudyGroup group = groupWithMembers(creator, member);
         when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
+        when(groupRepository.existsByIdAndMembersId(1L, creator.getId())).thenReturn(true);
         when(groupRepository.save(any(StudyGroup.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         StudyGroup result = groupService.removeMember(1L, member.getId(), creator.getId());
@@ -117,6 +121,7 @@ class GroupServiceTest {
         groupService = new GroupService(groupRepository, userRepository, clock);
         StudyGroup group = groupWithMembers(creator, member);
         when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
+        when(groupRepository.existsByIdAndMembersId(1L, creator.getId())).thenReturn(true);
 
         assertThatThrownBy(() -> groupService.removeMember(1L, creator.getId(), creator.getId()))
                 .isInstanceOf(AccessDeniedException.class);
@@ -127,6 +132,7 @@ class GroupServiceTest {
         groupService = new GroupService(groupRepository, userRepository, clock);
         StudyGroup group = groupWithMembers(creator);
         when(groupRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(group));
+        when(groupRepository.existsByIdAndMembersId(1L, creator.getId())).thenReturn(true);
 
         assertThatThrownBy(() -> groupService.removeMember(1L, creator.getId(), creator.getId()))
                 .isInstanceOf(LastGroupMemberException.class);

@@ -89,8 +89,7 @@ public class GroupService {
     }
 
     private void requireMember(StudyGroup group, Long userId) {
-        boolean isMember = group.getMembers().stream().anyMatch(member -> member.getId().equals(userId));
-        if (!isMember) {
+        if (!isMember(group.getId(), userId)) {
             throw new AccessDeniedException("You must be a member of this group to manage it");
         }
     }
