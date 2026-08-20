@@ -115,4 +115,19 @@ class RateLimitFilterTest {
         verify(filterChain, times(10)).doFilter(request, response);
         verify(response).setStatus(429);
     }
+
+    @Test
+    void tracksLimitsViaXForwardedForHeader() throws Exception {
+        when(request.getServletPath()).thenReturn("/auth/login");
+        when(request.getHeader("X-Forwarded-For")).thenReturn("203.0.113.195, 70.41.3.18");
+        when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
+
+        for (int i = 0; i < 10; i++) {
+            filter.doFilter(request, response, filterChain);
+        }
+        filter.doFilter(request, response, filterChain);
+
+        verify(filterChain, times(10)).doFilter(request, response);
+        verify(response).setStatus(429);
+    }
 }

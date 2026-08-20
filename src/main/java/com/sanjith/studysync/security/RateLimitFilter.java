@@ -47,7 +47,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 .orElse(null);
 
         if (matchedPattern != null) {
-            String key = request.getRemoteAddr() + ":" + matchedPattern;
+            String key = getClientIp(request) + ":" + matchedPattern;
             Bucket bucket = buckets.get(key, k -> newBucket());
             if (!bucket.tryConsume(1)) {
                 response.setStatus(429);
@@ -57,6 +57,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        String xff = request.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isEmpty()) {
+            return xff.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 
     private Bucket newBucket() {
