@@ -35,7 +35,7 @@ class RateLimitFilterTest {
 
     @Test
     void allowsRequestsToUnlimitedPaths() throws Exception {
-        when(request.getRequestURI()).thenReturn("/rooms");
+        when(request.getServletPath()).thenReturn("/rooms");
 
         for (int i = 0; i < 20; i++) {
             filter.doFilter(request, response, filterChain);
@@ -47,7 +47,7 @@ class RateLimitFilterTest {
 
     @Test
     void allowsRequestsWithinCapacity() throws Exception {
-        when(request.getRequestURI()).thenReturn("/auth/login");
+        when(request.getServletPath()).thenReturn("/auth/login");
         when(request.getRemoteAddr()).thenReturn("10.0.0.1");
 
         for (int i = 0; i < 10; i++) {
@@ -60,7 +60,7 @@ class RateLimitFilterTest {
 
     @Test
     void rejectsRequestsBeyondCapacityWith429() throws Exception {
-        when(request.getRequestURI()).thenReturn("/auth/login");
+        when(request.getServletPath()).thenReturn("/auth/login");
         when(request.getRemoteAddr()).thenReturn("10.0.0.2");
         when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
 
@@ -75,7 +75,7 @@ class RateLimitFilterTest {
 
     @Test
     void tracksLimitsPerIpIndependently() throws Exception {
-        when(request.getRequestURI()).thenReturn("/auth/login");
+        when(request.getServletPath()).thenReturn("/auth/login");
         when(request.getRemoteAddr()).thenReturn("10.0.0.3");
         when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
 
@@ -90,5 +90,29 @@ class RateLimitFilterTest {
         filter.doFilter(request, response, filterChain);
 
         verify(filterChain, times(11)).doFilter(request, response);
+    }
+
+    @Test
+    void rejectsRequestsWithTrailingSlashesAndSharesBucket() throws Exception {
+        when(request.getServletPath()).thenReturn("/auth/login");
+        when(request.getRemoteAddr()).thenReturn("10.0.0.5");
+        when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
+
+        // Consume 5 tokens with "/auth/login"
+        for (int i = 0; i < 5; i++) {
+            filter.doFilter(request, response, filterChain);
+        }
+
+        // Consume next 5 tokens with trailing slash "/auth/login/"
+        when(request.getServletPath()).thenReturn("/auth/login/");
+        for (int i = 0; i < 5; i++) {
+            filter.doFilter(request, response, filterChain);
+        }
+
+        // The 11th request (using trailing slash) should be blocked, proving the bucket is shared.
+        filter.doFilter(request, response, filterChain);
+
+        verify(filterChain, times(10)).doFilter(request, response);
+        verify(response).setStatus(429);
     }
 }

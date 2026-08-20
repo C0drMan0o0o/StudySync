@@ -27,6 +27,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final Duration BUCKET_IDLE_EXPIRY = Duration.ofMinutes(10);
     private static final long MAX_TRACKED_BUCKETS = 100_000;
 
+    private final org.springframework.util.AntPathMatcher pathMatcher = new org.springframework.util.AntPathMatcher();
+
     private final Cache<String, Bucket> buckets = Caffeine.newBuilder()
             .expireAfterAccess(BUCKET_IDLE_EXPIRY)
             .maximumSize(MAX_TRACKED_BUCKETS)
@@ -38,8 +40,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain) throws ServletException, IOException {
 
-        if (LIMITED_PATHS.contains(request.getRequestURI())) {
-            String key = request.getRemoteAddr() + ":" + request.getRequestURI();
+        String path = request.getServletPath();
+        String matchedPattern = LIMITED_PATHS.stream()
+                .filter(pattern -> pathMatcher.match(pattern, path) || pathMatcher.match(pattern + "/", path))
+                .findFirst()
+                .orElse(null);
+
+        if (matchedPattern != null) {
+            String key = request.getRemoteAddr() + ":" + matchedPattern;
             Bucket bucket = buckets.get(key, k -> newBucket());
             if (!bucket.tryConsume(1)) {
                 response.setStatus(429);
