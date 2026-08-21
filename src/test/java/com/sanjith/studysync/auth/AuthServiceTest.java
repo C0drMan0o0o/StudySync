@@ -15,7 +15,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,11 +38,12 @@ class AuthServiceTest {
     @Mock
     private JwtUtil jwtUtil;
 
+    private final Clock clock = Clock.fixed(Instant.parse("2024-01-01T00:00:00Z"), ZoneOffset.UTC);
     private AuthService authService;
 
     @Test
     void registerSavesUserWithHashedPasswordAndReturnsToken() {
-        authService = new AuthService(userRepository, passwordEncoder, jwtUtil);
+        authService = new AuthService(userRepository, passwordEncoder, jwtUtil, clock);
         RegisterRequest request = new RegisterRequest("alice@test.com", "password123", "Alice");
         when(userRepository.existsByEmail("alice@test.com")).thenReturn(false);
         when(passwordEncoder.encode("password123")).thenReturn("hashed-password");
@@ -54,11 +58,12 @@ class AuthServiceTest {
         assertThat(saved.getEmail()).isEqualTo("alice@test.com");
         assertThat(saved.getPasswordHash()).isEqualTo("hashed-password");
         assertThat(saved.getName()).isEqualTo("Alice");
+        assertThat(saved.getCreatedAt()).isEqualTo(LocalDateTime.ofInstant(clock.instant(), clock.getZone()));
     }
 
     @Test
     void registerThrowsWhenEmailAlreadyInUse() {
-        authService = new AuthService(userRepository, passwordEncoder, jwtUtil);
+        authService = new AuthService(userRepository, passwordEncoder, jwtUtil, clock);
         RegisterRequest request = new RegisterRequest("alice@test.com", "password123", "Alice");
         when(userRepository.existsByEmail("alice@test.com")).thenReturn(true);
 
@@ -70,13 +75,13 @@ class AuthServiceTest {
 
     @Test
     void loginReturnsTokenWhenCredentialsAreValid() {
-        authService = new AuthService(userRepository, passwordEncoder, jwtUtil);
+        authService = new AuthService(userRepository, passwordEncoder, jwtUtil, clock);
         User user = User.builder()
                 .id(1L)
                 .email("alice@test.com")
                 .passwordHash("hashed-password")
                 .name("Alice")
-                .createdAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now(clock))
                 .build();
         when(userRepository.findByEmail("alice@test.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("password123", "hashed-password")).thenReturn(true);
@@ -89,7 +94,7 @@ class AuthServiceTest {
 
     @Test
     void loginThrowsWhenEmailNotFound() {
-        authService = new AuthService(userRepository, passwordEncoder, jwtUtil);
+        authService = new AuthService(userRepository, passwordEncoder, jwtUtil, clock);
         when(userRepository.findByEmail("missing@test.com")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> authService.login(new LoginRequest("missing@test.com", "password123")))
@@ -98,13 +103,13 @@ class AuthServiceTest {
 
     @Test
     void loginThrowsWhenPasswordIsWrong() {
-        authService = new AuthService(userRepository, passwordEncoder, jwtUtil);
+        authService = new AuthService(userRepository, passwordEncoder, jwtUtil, clock);
         User user = User.builder()
                 .id(1L)
                 .email("alice@test.com")
                 .passwordHash("hashed-password")
                 .name("Alice")
-                .createdAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now(clock))
                 .build();
         when(userRepository.findByEmail("alice@test.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("wrong-password", "hashed-password")).thenReturn(false);

@@ -8,6 +8,7 @@ import com.sanjith.studysync.common.exception.InvalidCredentialsException;
 import com.sanjith.studysync.security.JwtUtil;
 import com.sanjith.studysync.user.User;
 import com.sanjith.studysync.user.UserRepository;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,12 +20,14 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final Clock clock;
     private final String dummyPasswordHash;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtUtil jwtUtil, Clock clock) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
+        this.clock = clock;
         this.dummyPasswordHash = passwordEncoder.encode("timing-attack-mitigation-dummy-password");
     }
 
@@ -37,7 +40,7 @@ public class AuthService {
                 .email(request.email())
                 .passwordHash(passwordEncoder.encode(request.password()))
                 .name(request.name())
-                .createdAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now(clock))
                 .build();
         userRepository.save(user);
 
