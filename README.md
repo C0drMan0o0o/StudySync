@@ -2,6 +2,57 @@
 
 A study group & room booking platform backend, built with Spring Boot.
 
+## Why I Built This
+
+StudySync was built to solve a common coordination problem in student and workspace environments: scheduling rooms and managing study groups without scheduling conflicts. While simple booking applications work sequentially, they often fail under high concurrency—allowing multiple users to book the same room at the same time. StudySync is engineered with a robust, two-layered conflict detection system (programmatic pessimistic locking at the application level and a PostgreSQL exclusion constraint at the database level) to guarantee booking integrity even when hundreds of requests arrive simultaneously.
+
+## Live Links
+
+* **Interactive API Docs (Swagger UI):** [https://studysync-backend-a947.onrender.com/swagger-ui.html](https://studysync-backend-a947.onrender.com/swagger-ui.html) *(Note: Render free tier takes ~50 seconds to wake up from cold start)*
+* **System Health Monitor (Actuator):** [https://studysync-backend-a947.onrender.com/actuator/health](https://studysync-backend-a947.onrender.com/actuator/health)
+
+## Architecture Diagram
+
+Below is the entity-relationship diagram representing StudySync's core domain models and their database mappings:
+
+```mermaid
+erDiagram
+    USER {
+        Long id PK
+        String email UK
+        String passwordHash
+        String name
+        LocalDateTime createdAt
+    }
+    ROOM {
+        Long id PK
+        String name
+        int capacity
+        String location
+    }
+    STUDY_GROUP {
+        Long id PK
+        String name
+        LocalDateTime createdAt
+        Long createdBy FK
+    }
+    BOOKING {
+        Long id PK
+        Long userId FK
+        Long roomId FK
+        Long groupId FK
+        LocalDateTime startTime
+        LocalDateTime endTime
+        LocalDateTime createdAt
+    }
+
+    USER ||--o{ BOOKING : "places"
+    ROOM ||--o{ BOOKING : "hosts"
+    STUDY_GROUP ||--o{ BOOKING : "claims (optional)"
+    USER ||--o{ STUDY_GROUP : "creates"
+    USER }o--o{ STUDY_GROUP : "belongs to (group_members)"
+```
+
 ## Status
 
 **Done:**
@@ -16,13 +67,7 @@ A study group & room booking platform backend, built with Spring Boot.
 - API docs (OpenAPI/Swagger UI)
 - Full request pipeline integration tests (`@SpringBootTest` + `MockMvc` + `Testcontainers`), including high-concurrency deadlock/double-booking race condition verification
 - Multi-stage application Dockerization and multi-container Docker Compose orchestration
-
-**Not built yet:**
-
-- Deploy (Railway or Render) with a managed Postgres instance and a live,
-  publicly reachable Swagger UI
-- README additions once deployed: a "why I built this" intro, an
-  architecture diagram, and the live demo + Swagger links
+- Production deployment on Render with managed PostgreSQL databases and live Swagger endpoints
 
 ## Tech stack
 
