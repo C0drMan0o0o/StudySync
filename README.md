@@ -66,13 +66,13 @@ erDiagram
 - Spring Boot Actuator for health checks and metrics monitoring
 - API docs (OpenAPI/Swagger UI)
 - Full request pipeline integration tests (`@SpringBootTest` + `MockMvc` + `Testcontainers`), including high-concurrency deadlock/double-booking race condition verification
-- Multi-stage application Dockerization and multi-container Docker Compose orchestration
-- Production deployment on Render with managed PostgreSQL databases and live Swagger endpoints
+- Multi-stage application Dockerisation and multi-container Docker Compose orchestration
+- Production deployment on Render paired with serverless PostgreSQL on Neon and live Swagger endpoints
 
 ## Tech stack
 
 - Java 21, Spring Boot 4.1.0, Maven
-- PostgreSQL 16 (Docker), Flyway migrations, Spring Data JPA (`ddl-auto: validate`)
+- PostgreSQL 16 (Neon Serverless in production, Docker locally), Flyway migrations, Spring Data JPA (`ddl-auto: validate`)
 - Spring Security 7, JWT (`jjwt`), BCrypt, Bucket4j + Caffeine rate limiting
 - Spring Boot Actuator (Metrics & Health)
 - springdoc-openapi (Swagger UI)
@@ -174,11 +174,11 @@ rate-limited to 10 requests/minute per IP. Interactive API docs are at
   rejecting the losers.
 
 
-- **Programmatic Transaction Retries & Room Locking**: To support high concurrency and mitigate database deadlock cycles (`40P01` SQLState) caused by overlapping slot insert contentions, booking creations bypass declarative `@Transactional` scopes. Instead, they run programmatically inside a `TransactionTemplate` retry loop (5 attempts with exponential backoff). The transaction begins by acquiring a pessimistic write lock on the target room (`findByIdForUpdate`), serializing competing bookings for the same room. Overlap validation checks are optimized using a fast database `EXISTS` query (`existsOverlapping`) rather than loading booking entities into JVM memory.
+- **Programmatic Transaction Retries & Room Locking**: To support high concurrency and mitigate database deadlock cycles (`40P01` SQLState) caused by overlapping slot insert contentions, booking creations bypass declarative `@Transactional` scopes. Instead, they run programmatically inside a `TransactionTemplate` retry loop (5 attempts with exponential backoff). The transaction begins by acquiring a pessimistic write lock on the target room (`findByIdForUpdate`), serialising competing bookings for the same room. Overlap validation checks are optimised using a fast database `EXISTS` query (`existsOverlapping`) rather than loading booking entities into JVM memory.
 
 
 - **Time comes from an injected `Clock`, not `LocalDateTime.now()`**:
-  `BookingService` and `GroupService` take a `java.time.Clock` via
+  `BookingService`, `GroupService`, and `AuthService` take a `java.time.Clock` via
   constructor injection (`ClockConfig` provides `Clock.systemDefaultZone()`
   in production) instead of calling `LocalDateTime.now()` directly, so tests
   can pin time with `Clock.fixed(...)` instead of depending on wall-clock
@@ -206,20 +206,23 @@ rate-limited to 10 requests/minute per IP. Interactive API docs are at
   against a precomputed dummy hash when no user is found.
 
 
-- **Rate-limit buckets are bounded, not just windowed**: the per-client
-  bucket map in `RateLimitFilter` used to be an unbounded
-  `ConcurrentHashMap` keyed by remote address — a slow memory-exhaustion
-  vector. It's now a Caffeine cache that evicts idle entries and caps total
-  size.
+- **Hardened Rate Limiting & Proxy IP Resolution**: The per-client bucket map
+  in `RateLimitFilter` uses a bounded Caffeine cache that evicts idle entries
+  to prevent memory exhaustion. Requests are matched via `AntPathMatcher` on
+  normalised servlet paths so trailing slashes (`/auth/login/`) share the same
+  bucket as standard endpoints (`/auth/login`), preventing rate limit bypasses.
+  Client IP addresses are extracted by inspecting `X-Forwarded-For` headers
+  to accurately enforce per-client limits behind reverse proxies and load balancers
+  (such as Render and Cloudflare) rather than throttling the shared proxy IP.
 
 
-- **Optimized Security Context Caching**: Authenticated API controllers (`BookingController`, `GroupController`) extract the domain `User` entity directly from Spring Security's `UserPrincipal` context (which implements `UserDetails` and holds the `User` model) rather than making redundant repository queries (`findByEmail`) on every request.
+- **Optimised Security Context Caching**: Authenticated API controllers (`BookingController`, `GroupController`) extract the domain `User` entity directly from Spring Security's `UserPrincipal` context (which implements `UserDetails` and holds the `User` model) rather than making redundant repository queries (`findByEmail`) on every request.
 
 
-- **Optimized JWT Processing**: Token verification and email claim extraction in `JwtUtil` are combined into `validateAndExtractEmail(token)`. This ensures that JWT claims are parsed and verified once per request inside `JwtAuthFilter` instead of twice.
+- **Optimised JWT Processing**: Token verification and email claim extraction in `JwtUtil` are combined into `validateAndExtractEmail(token)`. This ensures that JWT claims are parsed and verified once per request inside `JwtAuthFilter` instead of twice.
 
 
-- **Every exception maps to a sanitized response**: `GlobalExceptionHandler`
+- **Every exception maps to a sanitised response**: `GlobalExceptionHandler`
   has a logging catch-all plus explicit mappings for the common Spring MVC
   exceptions (malformed body, type mismatch, unsupported method, unknown
   route), so nothing falls through to a default response that leaks a stack
@@ -235,3 +238,9 @@ rate-limited to 10 requests/minute per IP. Interactive API docs are at
   zero members (there's no group-deletion endpoint, so a group persists
   once created). Group reads-for-mutation use a pessimistic write lock to
   avoid concurrent membership races.
+
+
+- **Optimised Group Membership Verification**: Membership checks (`isMember`)
+  use an indexed database existence query (`groupRepository.existsByIdAndMembersId`)
+  rather than loading the lazy collection of members into JVM heap memory and
+  streaming over it, keeping memory overhead constant regardless of group size.
